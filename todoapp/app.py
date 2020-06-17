@@ -1,5 +1,7 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, jsonify, abort
 from flask_sqlalchemy import SQLAlchemy
+import sys
+# TO RUN THIS, WE DO $ FLASK_APP=app.py FLASK_DEBUG=true flask run
 
 # create application (named after our file)
 app = Flask(__name__)
@@ -13,8 +15,8 @@ db = SQLAlchemy(app)
 
 class Todo(db.Model):
     __tablename__ = 'todos'
-    id = db.Column(db.Integer, primary_key = True)
-    description = db.Column(db.String(), nullable = False)
+    id = db.Column(db.Integer, primary_key=True)
+    description = db.Column(db.String(), nullable=False)
 
     def __repr__(self):
         return f'<Todo {self.id} {self.description}>'
@@ -24,20 +26,36 @@ db.create_all()
 # whenever something happens at route todos/create, we do this stuff
 @app.route('/todos/create', methods=['POST'])
 def create_todo():
-    description = request.form.get('description', '')
-    #we have a default empty string in case nothing comes in
-    #let's make a new todo object with description
-    todo = Todo(description=description)
-    db.session.add(todo)
-    # add as pending change
-    db.session.commit()
-    # commit the change
-    return redirect(url_for('index'))
-    # at the end of this, we redirect to this page (index)
+    error = False
+    body = {}
+    try:
+        #we want to get the json instead of the old stuff
+        description = request.get_json()['description']
+        #it comes as a dictionary
+        #we have a default empty string in case nothing comes in
+        #let's make a new todo object with description
+        todo = Todo(description=description)
+        db.session.add(todo)
+        # add as pending change
+        db.session.commit()
+        # commit the change
+        body['description'] = todo.description
+        #this way, we don't need to access todo.description after closing the connection
+        #therefore, we circumvent the expiry
+    except:
+        error = True
+        db.session.rollback()
+        print(sys.exc_info())
+    finally:
+        db.session.close()
+    if error:
+        abort (400)
+    else: 
+        return jsonify(body)
 
 # we've chosen post as our user data method
-@app.route('/') 
 #The index is the controller - tells the the user should view next, and what the model to do
+@app.route('/') 
 def index():
     # this is like column and etc,
     # Now we pass in the data from our database
