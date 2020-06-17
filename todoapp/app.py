@@ -1,6 +1,8 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify, abort
 from flask_sqlalchemy import SQLAlchemy
 import sys
+from flask_migrate import Migrate
+
 # TO RUN THIS, WE DO $ FLASK_APP=app.py FLASK_DEBUG=true flask run
 
 # create application (named after our file)
@@ -12,16 +14,21 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'postgres://danielzhang@localhost:5432/t
 # make our database
 db = SQLAlchemy(app)
 
+# this sets up the flask database migration commands
+migrate = Migrate(app, db)
 
 class Todo(db.Model):
     __tablename__ = 'todos'
     id = db.Column(db.Integer, primary_key=True)
     description = db.Column(db.String(), nullable=False)
+    # it's a new part of the db!
+    completed = db.Column(db.Boolean, nullable=False, default=False)
 
     def __repr__(self):
         return f'<Todo {self.id} {self.description}>'
 
-db.create_all()
+# this below command was needed to sync models - unneeded with migrations
+# db.create_all()
 
 # whenever something happens at route todos/create, we do this stuff
 @app.route('/todos/create', methods=['POST'])
